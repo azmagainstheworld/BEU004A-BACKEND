@@ -1,0 +1,23 @@
+import express from 'express';
+import dotenv from 'dotenv';
+import pool from './config/dbconfig.js';
+import usersRoute from './routes/usersRoute.js';
+
+dotenv.config();
+
+const app = express();
+app.use(express.json());
+
+app.get('/', (req, res) => {
+    return res.json({
+        msg: "Hello World",
+        subject: "IPPL"
+    });
+});
+
+app.use('/beu004a/users', usersRoute);
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log("Server is running on http://localhost:" + PORT);
+});
