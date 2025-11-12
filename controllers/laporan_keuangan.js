@@ -1,21 +1,18 @@
 import pool from "../config/dbconfig.js";
 
-// 🔹 GET Laporan Keuangan + total kumulatif hingga saat ini
 export const getLaporanKeuangan = async (req, res) => {
   try {
-    // 🔸 Ambil data per tanggal (biar bisa ditampilkan di tabel)
     const [rows] = await pool.query(`
       SELECT 
-        DATE(tanggal) AS tanggal,
+        DATE_FORMAT(tanggal, '%Y-%m-%d') AS tanggal,
         SUM(CASE WHEN jenis_transaksi = 'Kas' THEN nominal ELSE 0 END) AS Kas,
         SUM(CASE WHEN jenis_transaksi = 'Saldo JFS' THEN nominal ELSE 0 END) AS Saldo_JFS,
         SUM(CASE WHEN jenis_transaksi = 'Transfer' THEN nominal ELSE 0 END) AS Transfer
       FROM laporan_keuangan
-      GROUP BY DATE(tanggal)
+      GROUP BY DATE_FORMAT(tanggal, '%Y-%m-%d')
       ORDER BY tanggal DESC
     `);
 
-    // 🔸 Ambil total keseluruhan dari semua waktu
     const [[totalNow]] = await pool.query(`
       SELECT 
         SUM(CASE WHEN jenis_transaksi = 'Kas' THEN nominal ELSE 0 END) AS kas,

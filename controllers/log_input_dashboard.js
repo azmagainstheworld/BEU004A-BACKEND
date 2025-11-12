@@ -1,60 +1,66 @@
-import  pool  from '../config/dbconfig.js';
+import pool from '../config/dbconfig.js';
 
-export const getTodayRecentInputs = async (req, res) => {
+export const logTodayInputs = async (req, res) => {
   try {
-    // ambil tanggal hari ini
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
-    const todayStr = `${yyyy}-${mm}-${dd}`; // format YYYY-MM-DD
+    const todayStr = `${yyyy}-${mm}-${dd}`;
 
-    // query semua jenis input hari ini
     const query = `
       SELECT 
+        l.id_log_input_dashboard,
         'Delivery Fee' AS jenis,
         df.nominal AS nominal,
-        df.tanggal AS tanggal,
+        DATE(df.tanggal) AS tanggal,       -- hanya YYYY-MM-DD
         '-' AS jenis_pembayaran,
         '-' AS nama_karyawan,
         '-' AS deskripsi
-      FROM input_deliveryfee df
+      FROM log_input_dashboard l
+      JOIN input_deliveryfee df ON l.id_input_deliveryfee = df.id_input_deliveryfee
       WHERE DATE(df.tanggal) = ?
 
       UNION ALL
 
       SELECT
+        l.id_log_input_dashboard,
         'DFOD' AS jenis,
         d.nominal AS nominal,
-        d.tanggal_dfod AS tanggal,
+        DATE(d.tanggal_dfod) AS tanggal,   -- hanya YYYY-MM-DD
         d.jenis_pembayaran AS jenis_pembayaran,
         '-' AS nama_karyawan,
         '-' AS deskripsi
-      FROM input_dfod d
+      FROM log_input_dashboard l
+      JOIN input_dfod d ON l.id_input_dfod = d.id_input_dfod
       WHERE DATE(d.tanggal_dfod) = ?
 
       UNION ALL
 
       SELECT
+        l.id_log_input_dashboard,
         'Outgoing' AS jenis,
         o.nominal_bersih AS nominal,
-        o.tanggal_outgoing AS tanggal,
+        DATE(o.tanggal_outgoing) AS tanggal,   -- hanya YYYY-MM-DD
         o.jenis_pembayaran AS jenis_pembayaran,
         '-' AS nama_karyawan,
         '-' AS deskripsi
-      FROM input_outgoing o
+      FROM log_input_dashboard l
+      JOIN input_outgoing o ON l.id_input_outgoing = o.id_input_outgoing
       WHERE DATE(o.tanggal_outgoing) = ?
 
       UNION ALL
 
       SELECT
+        l.id_log_input_dashboard,
         'Pengeluaran' AS jenis,
         p.nominal_pengeluaran AS nominal,
-        p.tanggal_pengeluaran AS tanggal,
+        DATE(p.tanggal_pengeluaran) AS tanggal, -- hanya YYYY-MM-DD
         p.jenis_pembayaran AS jenis_pembayaran,
         k.nama_karyawan AS nama_karyawan,
         p.deskripsi AS deskripsi
-      FROM input_pengeluaran p
+      FROM log_input_dashboard l
+      JOIN input_pengeluaran p ON l.id_input_pengeluaran = p.id_input_pengeluaran
       LEFT JOIN karyawan k ON p.id_karyawan = k.id_karyawan
       WHERE DATE(p.tanggal_pengeluaran) = ?
 
@@ -64,7 +70,7 @@ export const getTodayRecentInputs = async (req, res) => {
     const [rows] = await pool.query(query, [todayStr, todayStr, todayStr, todayStr]);
     res.json(rows);
   } catch (err) {
-    console.error('Error fetching today recent inputs:', err);
+    console.error('Error fetching log input dashboard:', err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };

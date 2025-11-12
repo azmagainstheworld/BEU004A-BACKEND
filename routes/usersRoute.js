@@ -22,9 +22,25 @@ import {
   deleteDeliveryFee,
 } from "../controllers/input_deliveryfee.js";
 
+import {
+  getAllDFOD,
+  getDFODById,
+  insertDFOD,
+  editDFOD,
+  deleteDFOD
+} from "../controllers/input_dfod.js";
+
+import {
+  getAllPengeluaran,
+  getPengeluaranById,
+  insertPengeluaran,
+  editPengeluaran,
+  deletePengeluaran
+} from "../controllers/input_pengeluaran.js";
+
 import { getLaporanKeuangan } from "../controllers/laporan_keuangan.js";
 
-import { getTodayRecentInputs } from '../controllers/log_input_dashboard.js';
+import { logTodayInputs } from "../controllers/log_input_dashboard.js";
 
 import {
   getAllPresensi,
@@ -34,7 +50,7 @@ import {
 
 import { verifyRole } from "../middleware/verifyRole.js";
 
-const router = express.Router();
+const router = express.Router()
 
 router.get("/superadmin", verifyRole(["Super Admin"]), getAllUsers);
 router.post("/superadmin", createSuperAdmin);
@@ -47,9 +63,21 @@ router.post("/deliveryfee", verifyRole(["Super Admin", "Admin"]), insertDelivery
 router.put("/deliveryfee", verifyRole(["Super Admin"]), editDeliveryFee);
 router.delete("/deliveryfee", verifyRole(["Super Admin"]), deleteDeliveryFee);
 
+router.get("/dfod", verifyRole(["Admin", "Super Admin"]), getAllDFOD);
+router.get("/dfodbyid", verifyRole(["Admin", "Super Admin"]), getDFODById);
+router.post("/dfod", verifyRole(["Admin", "Super Admin"]), insertDFOD);
+router.put("/dfod", verifyRole(["Super Admin"]), editDFOD);
+router.delete("/dfod", verifyRole(["Super Admin"]), deleteDFOD);
+
+router.get("/pengeluaran", verifyRole(["Admin", "SuperAdmin"]), getAllPengeluaran);
+router.get("/pengeluaranbyid", verifyRole(["Admin", "SuperAdmin"]), getPengeluaranById);
+router.post("/pengeluaran", verifyRole(["Admin", "SuperAdmin"]), insertPengeluaran);
+router.put("/pengeluaran", verifyRole(["SuperAdmin"]), editPengeluaran);
+router.delete("/pengeluaran", verifyRole(["SuperAdmin"]), deletePengeluaran);
+
 router.get("/laporan-keuangan", verifyRole(["SuperAdmin"]), getLaporanKeuangan);
 
-router.get("/log/recent", verifyRole(["Super Admin", "Admin"]), getTodayRecentInputs);
+router.get("/today", verifyRole(["Super Admin", "Admin"]), logTodayInputs);
 
 router.get("/karyawan", verifyRole(["Super Admin"]), getAllKaryawan);
 router.get("/karyawan/byid", verifyRole(["Super Admin"]), getKaryawanById);
@@ -85,11 +113,7 @@ router.put("/", verifyRole(["Super Admin"]), editPresensi);
 // router.put('/outgoing/:id', outgoingController.updateOutgoing);
 // router.delete('/outgoing/:id', outgoingController.deleteOutgoing);
 
-// router.get('/pengeluaran', pengeluaranController.getAllPengeluaran);
-// router.get('/pengeluaran/:id', pengeluaranController.getPengeluaranById);
-// router.post('/pengeluaran', pengeluaranController.createPengeluaran);
-// router.put('/pengeluaran/:id', pengeluaranController.updatePengeluaran);
-// router.delete('/pengeluaran/:id', pengeluaranController.deletePengeluaran);
+
 
 
 
@@ -99,8 +123,6 @@ router.put("/", verifyRole(["Super Admin"]), editPresensi);
 // router.put('/laporan-gaji/:id', laporanGajiController.updateLaporanGaji);
 // router.delete('/laporan-gaji/:id', laporanGajiController.deleteLaporanGaji);
 
-// router.get('/log-dashboard', logDashboardController.getAllLogs);
-// router.get('/log-dashboard/:id', logDashboardController.getLogById);
 
 // router.get('/manajemen-gaji', manajemenGajiController.getAllManajemenGaji);
 // router.post('/manajemen-gaji', manajemenGajiController.createManajemenGaji);

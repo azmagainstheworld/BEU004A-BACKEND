@@ -1,6 +1,5 @@
 const db = require('../config/dbconfig');
 
-// GET all outgoing records
 exports.getAllOutgoing = (req, res) => {
   db.query("SELECT * FROM input_outgoing", (err, results) => {
     if (err) {
@@ -11,7 +10,6 @@ exports.getAllOutgoing = (req, res) => {
   });
 };
 
-// GET outgoing by ID
 exports.getOutgoingById = (req, res) => {
   const { id } = req.body;
   db.query("SELECT * FROM input_outgoing WHERE id_input_outgoing = ?", [id], (err, results) => {
@@ -21,7 +19,6 @@ exports.getOutgoingById = (req, res) => {
   });
 };
 
-// CREATE new outgoing
 exports.createOutgoing = (req, res) => {
   const { tanggal_outgoing, jenis_pembayaran, nominal, deskripsi } = req.body;
   db.query(
@@ -33,7 +30,6 @@ exports.createOutgoing = (req, res) => {
     });
 };
 
-// UPDATE outgoing
 exports.updateOutgoing = (req, res) => {
   const { id, tanggal_outgoing, jenis_pembayaran, nominal, deskripsi } = req.body;
   db.query(
@@ -46,7 +42,6 @@ exports.updateOutgoing = (req, res) => {
     });
 };
 
-// DELETE outgoing
 exports.deleteOutgoing = (req, res) => {
   const { id } = req.body;
   db.query("DELETE FROM input_outgoing WHERE id_input_outgoing = ?", [id], (err, results) => {
