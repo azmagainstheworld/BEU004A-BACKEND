@@ -2,6 +2,8 @@ import express from 'express';
 import dotenv from 'dotenv';
 import pool from './config/dbconfig.js';
 import usersRoute from './routes/usersRoute.js';
+import authRoutes from "./routes/authRoutes.js";
+
 
 dotenv.config();
 
@@ -16,6 +18,8 @@ app.get('/', (req, res) => {
 });
 
 app.use('/beu004a/users', usersRoute);
+app.use('/beu004a/auth', authRoutes);
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
