@@ -2,11 +2,9 @@ import pool from '../config/dbconfig.js';
 
 export const logTodayInputs = async (req, res) => {
   try {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    const todayStr = `${yyyy}-${mm}-${dd}`;
+    const todayStr = new Date().toLocaleDateString("en-CA", {
+      timeZone: "Asia/Makassar",
+    });
 
     const query = `
       SELECT 
