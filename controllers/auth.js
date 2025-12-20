@@ -33,7 +33,7 @@ export const requestResetPassword = async (req, res) => {
     );
 
     // Kirim email berisi link reset password
-    const link = `${process.env.BASE_URL}/reset-password?token=${token}`;
+    const link = `https://beu-004-a.vercel.app/reset-password?token=${token}`;
 
     await sendEmail(
       email,
