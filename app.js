@@ -23,6 +23,11 @@ app.use('/beu004a/users', usersRoute);
 app.use('/beu004a/auth', authRoutes);
 
 const PORT = process.env.PORT || 4000;
+// Tambahkan route ini agar Railway tahu server hidup
+app.get("/", (req, res) => {
+  res.send("Backend J&T Cargo is Running!");
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
 });
