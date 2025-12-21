@@ -4,13 +4,13 @@ export const getLaporanKeuangan = async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT 
-        DATE_FORMAT(tanggal, '%Y-%m-%d') AS tanggal,
+        DATE_FORMAT(tanggal, '%Y-%m-%d') AS tanggal_bersih,
         SUM(CASE WHEN jenis_transaksi = 'Kas' THEN nominal ELSE 0 END) AS Kas,
         SUM(CASE WHEN jenis_transaksi = 'Saldo JFS' THEN nominal ELSE 0 END) AS Saldo_JFS,
         SUM(CASE WHEN jenis_transaksi = 'Transfer' THEN nominal ELSE 0 END) AS Transfer
       FROM laporan_keuangan
       GROUP BY DATE(tanggal)
-      ORDER BY tanggal DESC
+      ORDER BY tanggal_bersih DESC
     `);
 
     const [[totalNow]] = await pool.query(`
