@@ -9,7 +9,7 @@ export const getLaporanKeuangan = async (req, res) => {
         SUM(CASE WHEN jenis_transaksi = 'Saldo JFS' THEN nominal ELSE 0 END) AS Saldo_JFS,
         SUM(CASE WHEN jenis_transaksi = 'Transfer' THEN nominal ELSE 0 END) AS Transfer
       FROM laporan_keuangan
-      GROUP BY DATE(tanggal)
+      GROUP BY tanggal_bersih
       ORDER BY tanggal_bersih DESC
     `);
 
