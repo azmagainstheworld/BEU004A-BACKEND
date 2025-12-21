@@ -14,6 +14,7 @@ export const getAllManajemenGaji = async (req, res) => {
       FROM karyawan k
       LEFT JOIN manajemen_gaji mg 
         ON k.id_karyawan = mg.id_karyawan
+      WHERE k.status = 'active'  
       ORDER BY k.nama_karyawan ASC
     `;
 
@@ -26,10 +27,6 @@ export const getAllManajemenGaji = async (req, res) => {
 };
 
 
-/* ================================
-   SAVE / UPDATE MANAJEMEN GAJI
-   (FE MENGIRIM: id_karyawan, upah_perhari, bonus)
-================================ */
 export const saveManajemenGaji = async (req, res) => {
   try {
     const { id_karyawan, upah_perhari, bonus } = req.body;

@@ -74,6 +74,7 @@ const getLaporanGaji = async (req, res) => {
 
       FROM karyawan k
       LEFT JOIN manajemen_gaji mg ON mg.id_karyawan = k.id_karyawan
+      WHERE k.status = 'active'
       ORDER BY k.nama_karyawan ASC;
     `;
 
