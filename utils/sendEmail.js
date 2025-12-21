@@ -50,32 +50,60 @@
 //   }
 // };
 
-import nodemailer from "nodemailer";
+// import nodemailer from "nodemailer";
+
+// export const sendEmail = async (to, subject, htmlContent) => {
+//   const transporter = nodemailer.createTransport({
+//     host: "smtp.gmail.com",
+//     port: 465, // Coba ganti ke 465
+//     secure: true, // Wajib true untuk port 465
+//     auth: {
+//       user: process.env.EMAIL_USER,
+//       pass: process.env.EMAIL_PASS
+//     },
+//     tls: {
+//       rejectUnauthorized: false 
+//     }
+//   });
+
+//   try {
+//     // Tambahkan timeout internal agar tidak loading selamanya
+//     await transporter.sendMail({
+//       from: `"Admin J&T Cargo" <${process.env.EMAIL_USER}>`,
+//       to,
+//       subject,
+//       html: htmlContent,
+//     });
+//   } catch (error) {
+//     console.error("Gagal mengirim email:", error);
+//     throw error; 
+//   }
+// };
+
+// utils/sendEmail.js
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const sendEmail = async (to, subject, htmlContent) => {
-  const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465, // Coba ganti ke 465
-    secure: true, // Wajib true untuk port 465
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    },
-    tls: {
-      rejectUnauthorized: false 
-    }
-  });
-
   try {
-    // Tambahkan timeout internal agar tidak loading selamanya
-    await transporter.sendMail({
-      from: `"Admin J&T Cargo" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
+    const { data, error } = await resend.emails.send({
+      // Label tetap 'Admin J&T Cargo', tapi alamat pengirim WAJIB onboarding@resend.dev
+      from: 'Admin J&T Cargo <onboarding@resend.dev>', 
+      to: [to], 
+      subject: subject,
       html: htmlContent,
     });
+
+    if (error) {
+      console.error("Resend Error Detail:", error);
+      throw new Error(error.message);
+    }
+
+    console.log("Email berhasil dikirim via Resend API ID:", data.id);
+    return data;
   } catch (error) {
-    console.error("Gagal mengirim email:", error);
+    console.error("Gagal mengirim email via Resend:", error);
     throw error; 
   }
 };
