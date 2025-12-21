@@ -25,36 +25,36 @@ const mapJenisTransaksi = (jenis_pembayaran) => {
 };
 
 //  GET ALL
-
 export const getAllPengeluaran = async (req, res) => {
-    // Fungsi ini tidak memerlukan transaksi, hanya pool.query
     try {
         const userRoles = req.user?.roles || [];
-        let query;
+        const todayStr = formatTanggal(); 
 
         if (userRoles.some(r => r.replace(/\s+/g, '').toLowerCase() === "superadmin")) {
-            query = `
+            const query = `
                 SELECT p.*, k.nama_karyawan
                 FROM input_pengeluaran p
                 LEFT JOIN karyawan k ON p.id_karyawan = k.id_karyawan
                 WHERE p.status = 'active'
                 ORDER BY p.tanggal_pengeluaran DESC
             `;
+            const [rows] = await pool.query(query);
+            return res.json(rows);
+
         } else if (userRoles.some(r => r.replace(/\s+/g, '').toLowerCase() === "admin")) {
-            query = `
+            const query = `
                 SELECT p.*, k.nama_karyawan
                 FROM input_pengeluaran p
                 LEFT JOIN karyawan k ON p.id_karyawan = k.id_karyawan
-                WHERE p.status = 'active' AND DATE(p.tanggal_pengeluaran) = CURDATE()
+                WHERE p.status = 'active' AND DATE(p.tanggal_pengeluaran) = ?
                 ORDER BY p.tanggal_pengeluaran DESC
             `;
+            const [rows] = await pool.query(query, [todayStr]);
+            return res.json(rows);
+
         } else {
             return res.status(403).json({ error: "Access denied" });
         }
-
-        console.log("Query dijalankan:", query); // debug
-        const [rows] = await pool.query(query);
-        res.json(rows);
 
     } catch (err) {
         console.error("Error fetching pengeluaran:", err);

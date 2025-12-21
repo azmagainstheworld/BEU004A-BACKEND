@@ -25,18 +25,20 @@ const mapJenisTransaksi = (jenis_pembayaran) => {
 export const getAllDFOD = async (req, res) => {
   try {
     const userRoles = req.user?.roles || [];
-    let query;
+    const todayStr = formatTanggal(); 
 
     if (userRoles.some(r => r.replace(/\s+/g, '').toLowerCase() === "superadmin")) {
-      query = "SELECT * FROM input_dfod WHERE status = 'active' ORDER BY tanggal_dfod DESC";
+      const [rows] = await pool.query(
+        "SELECT * FROM input_dfod WHERE status = 'active' ORDER BY tanggal_dfod DESC"
+      );
+      return res.json(rows);
     } else if (userRoles.some(r => r.replace(/\s+/g, '').toLowerCase() === "admin")) {
-      query = "SELECT * FROM input_dfod WHERE status = 'active' AND DATE(tanggal_dfod) = CURDATE() ORDER BY tanggal_dfod DESC";
+      const query = "SELECT * FROM input_dfod WHERE status = 'active' AND DATE(tanggal_dfod) = ? ORDER BY tanggal_dfod DESC";
+      const [rows] = await pool.query(query, [todayStr]);
+      return res.json(rows);
     } else {
       return res.status(403).json({ error: "Access denied" });
     }
-
-    const [rows] = await pool.query(query);
-    res.json(rows);
   } catch (err) {
     console.error("Error fetching DFOD:", err);
     res.status(500).json({ error: "Internal Server Error" });

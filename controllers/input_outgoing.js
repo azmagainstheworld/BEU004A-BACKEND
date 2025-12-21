@@ -45,31 +45,35 @@ const normalizeJenisPembayaran = (raw) => {
 //  CRUD 
 
 export const getAllOutgoing = async (req, res) => {
-  try {
-    const userRoles = req.user?.roles || [];
-    let query;
+  try {
+    const userRoles = req.user?.roles || [];
+    const todayStr = formatTanggal(); 
 
-    let statusFilter = "WHERE status = 'active'";
+    let statusFilter = "WHERE status = 'active'";
 
-    if (userRoles.some(r => r.replace(/\s+/g, '').toLowerCase() === "superadmin")) {
-      query = `SELECT * FROM input_outgoing ${statusFilter} ORDER BY tanggal_outgoing DESC`;
-    } else if (userRoles.some(r => r.replace(/\s+/g, '').toLowerCase() === "admin")) {
-      query = `
-SELECT * FROM input_outgoing
-${statusFilter} AND DATE(tanggal_outgoing) = CURDATE()
-ORDER BY tanggal_outgoing DESC
-`;
-    } else {
-      return res.status(403).json({ error: "Access denied" });
-    }
+    if (userRoles.some(r => r.replace(/\s+/g, '').toLowerCase() === "superadmin")) {
+      // Super Admin: Melihat semua data tanpa filter tanggal
+      const query = `SELECT * FROM input_outgoing ${statusFilter} ORDER BY tanggal_outgoing DESC`;
+      const [results] = await pool.query(query);
+      return res.json(results);
 
-    const [results] = await pool.query(query);
-    res.json(results);
+    } else if (userRoles.some(r => r.replace(/\s+/g, '').toLowerCase() === "admin")) {
+      const query = `
+        SELECT * FROM input_outgoing
+        ${statusFilter} AND DATE(tanggal_outgoing) = ?
+        ORDER BY tanggal_outgoing DESC
+      `;
+      const [results] = await pool.query(query, [todayStr]);
+      return res.json(results);
 
-  } catch (err) {
-    console.error("Error fetching outgoing:", err);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
+    } else {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+  } catch (err) {
+    console.error("Error fetching outgoing:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 };
 
 export const insertOutgoing = async (req, res) => {
