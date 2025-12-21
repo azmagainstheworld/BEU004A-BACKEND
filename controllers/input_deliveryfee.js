@@ -227,14 +227,12 @@
 
 import pool from "../config/dbconfig.js";
 
-// ======================== UTILITY ========================
 const formatTanggal = () => {
   return new Date().toLocaleDateString("en-CA", {
     timeZone: "Asia/Makassar",
   });
 };
 
-// ======================== GET ALL (LOG AKTIF) ========================
 export const getAllDeliveryFee = async (req, res) => {
     try {
         const userRoles = req.user?.roles || [];
