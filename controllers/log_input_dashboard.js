@@ -12,7 +12,7 @@ export const logTodayInputs = async (req, res) => {
         l.id_log_input_dashboard,
         'Delivery Fee' AS jenis,
         df.nominal AS nominal,
-        DATE_FORMAT(df.tanggal, '%Y-%m-%d') AS tanggal_bersih, -- Format di sini
+        DATE_FORMAT(df.tanggal, '%Y-%m-%d') AS tanggal_bersih, 
         '-' AS jenis_pembayaran,
         '-' AS jenis_pengeluaran,
         '-' AS nama_karyawan,
@@ -27,7 +27,7 @@ export const logTodayInputs = async (req, res) => {
         l.id_log_input_dashboard,
         'DFOD' AS jenis,
         d.nominal AS nominal,
-        DATE_FORMAT(d.tanggal_dfod, '%Y-%m-%d') AS tanggal_bersih, -- Format di sini
+        DATE_FORMAT(d.tanggal_dfod, '%Y-%m-%d') AS tanggal_bersih, 
         d.jenis_pembayaran AS jenis_pembayaran,
         '-' AS jenis_pengeluaran,
         '-' AS nama_karyawan,
@@ -42,7 +42,7 @@ export const logTodayInputs = async (req, res) => {
         l.id_log_input_dashboard,
         'Outgoing' AS jenis,
         o.nominal_bersih AS nominal,
-        DATE_FORMAT(o.tanggal_outgoing, '%Y-%m-%d') AS tanggal_bersih, -- Format di sini
+        DATE_FORMAT(o.tanggal_outgoing, '%Y-%m-%d') AS tanggal_bersih, 
         o.jenis_pembayaran AS jenis_pembayaran,
         '-' AS jenis_pengeluaran,
         '-' AS nama_karyawan,
@@ -57,7 +57,7 @@ export const logTodayInputs = async (req, res) => {
         l.id_log_input_dashboard,
         'Pengeluaran' AS jenis,
         p.nominal_pengeluaran AS nominal,
-        DATE_FORMAT(p.tanggal_pengeluaran, '%Y-%m-%d') AS tanggal_bersih, -- Format di sini
+        DATE_FORMAT(p.tanggal_pengeluaran, '%Y-%m-%d') AS tanggal_bersih, 
         p.jenis_pembayaran AS jenis_pembayaran,
         p.jenis_pengeluaran AS jenis_pengeluaran,
         k.nama_karyawan AS nama_karyawan,
