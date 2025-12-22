@@ -41,6 +41,7 @@ const getLaporanGaji = async (req, res) => {
           SELECT IFNULL(SUM(ip.nominal_pengeluaran),0)
           FROM input_pengeluaran ip
           WHERE ip.id_karyawan = k.id_karyawan
+            AND ip.status = 'active' -- <--- TAMBAHKAN INI (Filter status aktif)
             AND DATE(ip.tanggal_pengeluaran) BETWEEN ? AND ?
         ) AS kasbon,
 
@@ -69,6 +70,7 @@ const getLaporanGaji = async (req, res) => {
           SELECT IFNULL(SUM(ip2.nominal_pengeluaran),0)
           FROM input_pengeluaran ip2
           WHERE ip2.id_karyawan = k.id_karyawan
+            AND ip2.status = 'active' -- <--- TAMBAHKAN INI (Filter status aktif)
             AND DATE(ip2.tanggal_pengeluaran) BETWEEN ? AND ?
         ) AS gaji_bersih
 
