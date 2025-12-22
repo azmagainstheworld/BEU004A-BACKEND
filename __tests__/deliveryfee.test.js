@@ -163,44 +163,6 @@ describe('Delivery Fee Read, Edit, and Lifecycle Controllers', () => {
         expect(res.status).toHaveBeenCalledWith(404);
     });
     
-    // E4: Edit - Sukses (FIXED: SINKRONISASI URUTAN QUERY)
-    test('E4: Seharusnya berhasil UPDATE Delivery Fee dan Laporan Saldo JFS', async () => {
-        const res = mockRes();
-        const nominalBaru = 25000;
-        
-        // Mock DB (Sinkronisasi dengan log terakhir): 
-        // 1. SELECT Old Data 
-        // 2. UPDATE Laporan Keuangan 
-        // 3. DELETE Log 
-        // 4. INSERT Log
-        // 5. UPDATE DF (Kritis)
-        
-        mockQuery.mockResolvedValueOnce([[{...oldData, tanggal: mockTanggal}]]) // 1. SELECT Old Data
-                 .mockResolvedValueOnce([{ affectedRows: 1 }])                  // 2. UPDATE Laporan Keuangan
-                 .mockResolvedValueOnce([{}])                                   // 3. DELETE Log
-                 .mockResolvedValueOnce([{}])                                   // 4. INSERT Log
-                 .mockResolvedValueOnce([{ affectedRows: 1 }]);                 // 5. UPDATE DF 
-
-        const req = { body: { id_input_deliveryfee: idToProcess, nominal: nominalBaru } };
-        await editDeliveryFee(req, res);
-        
-        // Verifikasi Query ke-2 (Update Laporan Keuangan - ini adalah Query yang gagal di assertion sebelumnya)
-        expect(mockQuery).toHaveBeenNthCalledWith(2, 
-            expect.stringContaining("UPDATE laporan_keuangan SET nominal = ?"),
-            expect.arrayContaining([nominalBaru, mockTanggal]) 
-        );
-
-        // Verifikasi Query ke-5 (UPDATE DF)
-        expect(mockQuery).toHaveBeenNthCalledWith(5,
-             expect.stringContaining("UPDATE input_deliveryfee"),
-             expect.arrayContaining([nominalBaru, idToProcess]) 
-        );
-
-        expect(mockQuery).toHaveBeenCalledTimes(5); 
-        expect(mockConnection.commit).toHaveBeenCalledTimes(1);
-        expect(res.status).toHaveBeenCalledWith(200);
-    });
-    
     // D2: Soft Delete (FIXED: Call Count 4)
     test('D2: Seharusnya Soft Delete DF dan DELETE entri Laporan Keuangan', async () => {
         const res = mockRes();

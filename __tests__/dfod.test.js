@@ -1,7 +1,5 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 
-// 1. MOCK HARUS DI ATAS IMPORT TARGET
-// Kita buat mock function di luar agar bisa diakses
 const mockGetConnection = jest.fn();
 
 jest.unstable_mockModule('../config/dbconfig.js', () => ({
@@ -11,9 +9,7 @@ jest.unstable_mockModule('../config/dbconfig.js', () => ({
   }
 }));
 
-// 2. Import module setelah mock (Gunakan dynamic import jika perlu, 
-// atau biarkan Jest menangani hoisting unstable_mockModule)
-const { insertDFOD } = await import('../controllers/dfodController.js');
+const { insertDFOD } = await import('../controllers/input_dfod.js');
 const { default: pool } = await import('../config/dbconfig.js');
 
 describe('White Box Testing - insertDFOD (Internal Logic)', () => {
