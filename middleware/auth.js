@@ -31,9 +31,12 @@ export const verifyToken = (req, res, next) => {
           });
         }
       } else {
-        res.locals.userId = decoded.userId;
-        res.locals.userEmail = decoded.userEmail;
-        res.locals.userRole = decoded.role;
+        req.user = {
+          userId: decoded.userId,
+          userEmail: decoded.userEmail,
+          role: decoded.role, // Simpan tunggal
+          roles: [decoded.role] // Dan simpan jamak untuk mendukung .some()
+          };
         return next();
       }
     });

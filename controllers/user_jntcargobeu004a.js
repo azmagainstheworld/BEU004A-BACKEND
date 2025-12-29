@@ -12,6 +12,22 @@ const ROLE_ADMIN = "Admin";
 // 1. GET ALL USERS (Hanya yang Statusnya ACTIVE)
 export const getAllUsers = async (req, res) => {
   try {
+    // 1. Ambil roles dari req.user (hasil dari middleware verifyRole)
+    const userRoles = req.user?.roles || [];
+
+    // 2. Lakukan pengecekan role (Ignore case & spasi sesuai standar middleware Anda)
+    const isAuthorized = userRoles.some(r => {
+      const roleClean = r.replace(/\s+/g, '').toLowerCase();
+      return roleClean === "superadmin" || roleClean === "admin";
+    });
+
+    // 3. Jika bukan Super Admin atau Admin, tolak akses
+    if (!isAuthorized) {
+      return res.status(403).json({ 
+        error: "Akses ditolak: Hanya Super Admin dan Admin yang diizinkan melihat daftar user" 
+      });
+    }
+    
     const [results] = await pool.query(
       "SELECT id_user_jntcargobeu004a, username, email, roles FROM user_jntcargobeu004a WHERE status = ?",
       [STATUS_ACTIVE]
@@ -67,6 +83,10 @@ export const createSuperAdmin = async (req, res) => {
 // 3. CREATE ADMIN
 // =================================================================
 export const createAdmin = async (req, res) => {
+  if (req.user?.role !== "Super Admin") {
+    return res.status(403).json({ error: "Akses ditolak: Hanya Super Admin yang dapat membuat akun Admin baru" });
+  }
+
   const { username, email, password } = req.body;
   const roles = ROLE_ADMIN;
 
@@ -200,6 +220,10 @@ export const loginUser = async (req, res) => {
 // 5. DELETE USER (SOFT DELETE) 🗑️
 // =================================================================
 export const deleteUser = async (req, res) => {
+  if (req.user?.role !== "Super Admin") {
+    return res.status(403).json({ error: "Akses ditolak: Hanya Super Admin yang dapat melihat sampah akun" });
+  }
+
   const { id_user_jntcargobeu004a } = req.body;
 
   if (!id_user_jntcargobeu004a) {
@@ -244,6 +268,10 @@ export const deleteUser = async (req, res) => {
 // 6. GET TRASH ADMIN (Dapatkan Admin dengan status 'deleted')
 // =================================================================
 export const getTrashAdmin = async (req, res) => {
+  if (req.user?.role !== "Super Admin") {
+    return res.status(403).json({ error: "Akses ditolak: Hanya Super Admin yang dapat melihat sampah akun" });
+  }
+
     try {
         const [results] = await pool.query(
             "SELECT id_user_jntcargobeu004a, username, email FROM user_jntcargobeu004a WHERE roles = ? AND status = ?",
@@ -260,6 +288,10 @@ export const getTrashAdmin = async (req, res) => {
 // 7. RESTORE ADMIN (Kembalikan status Admin menjadi 'active')
 // =================================================================
 export const restoreAdmin = async (req, res) => {
+  if (req.user?.role !== "Super Admin") {
+    return res.status(403).json({ error: "Akses ditolak: Hanya Super Admin yang dapat melihat sampah akun" });
+  }
+
     const { id_user_jntcargobeu004a } = req.body;
 
     if (!id_user_jntcargobeu004a) {
@@ -298,6 +330,10 @@ export const restoreAdmin = async (req, res) => {
 // 8. DELETE PERMANENT ADMIN (Hapus fisik dari database)
 // =================================================================
 export const deletePermanentAdmin = async (req, res) => {
+  if (req.user?.role !== "Super Admin") {
+    return res.status(403).json({ error: "Akses ditolak: Hanya Super Admin yang dapat melihat sampah akun" });
+  }
+
     const { id_user_jntcargobeu004a } = req.body;
 
     if (!id_user_jntcargobeu004a) {

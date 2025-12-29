@@ -2,6 +2,11 @@ import pool from "../config/dbconfig.js";
 
 // --- GET ALL KARYAWAN (ACTIVE ONLY) ---
 export const getAllKaryawan = async (req, res) => {
+  const role = req.user?.role;
+  if (role !== "Super Admin" && role !== "Admin") {
+    return res.status(403).json({ error: "Akses ditolak: Anda tidak memiliki izin" });
+  }
+  
   try {
     const [rows] = await pool.query("SELECT * FROM karyawan WHERE status = 'active'");
     res.json(rows);
@@ -13,6 +18,10 @@ export const getAllKaryawan = async (req, res) => {
 
 // --- GET TRASH KARYAWAN (DELETED ONLY) ---
 export const getTrashKaryawan = async (req, res) => {
+  if (req.user?.role !== "Super Admin") {
+    return res.status(403).json({ error: "Akses ditolak: Hanya Super Admin yang diizinkan" });
+  }
+
   try {
     const [rows] = await pool.query("SELECT * FROM karyawan WHERE status = 'deleted'");
     res.json(rows);
@@ -43,6 +52,10 @@ export const getKaryawanById = async (req, res) => {
 
 // --- CREATE KARYAWAN ---
 export const createKaryawan = async (req, res) => {
+  if (req.user?.role !== "Super Admin") {
+    return res.status(403).json({ error: "Akses ditolak: Hanya Super Admin yang diizinkan" });
+  }
+
   try {
     const { nama_karyawan, jenis_kelamin, ttl, alamat } = req.body;
 
@@ -68,6 +81,10 @@ export const createKaryawan = async (req, res) => {
 
 // --- UPDATE KARYAWAN ---
 export const editKaryawan = async (req, res) => {
+  if (req.user?.role !== "Super Admin") {
+    return res.status(403).json({ error: "Akses ditolak: Hanya Super Admin yang diizinkan" });
+  }
+
   try {
     const { id_karyawan, nama_karyawan, jenis_kelamin, ttl, alamat } = req.body;
 
@@ -123,6 +140,10 @@ export const editKaryawan = async (req, res) => {
 
 // --- SOFT DELETE KARYAWAN ---
 export const deleteKaryawan = async (req, res) => {
+  if (req.user?.role !== "Super Admin") {
+    return res.status(403).json({ error: "Akses ditolak: Hanya Super Admin yang diizinkan" });
+  }
+
   try {
     const { id_karyawan } = req.body;
 
@@ -146,6 +167,10 @@ export const deleteKaryawan = async (req, res) => {
 
 // --- RESTORE KARYAWAN ---
 export const restoreKaryawan = async (req, res) => {
+  if (req.user?.role !== "Super Admin") {
+    return res.status(403).json({ error: "Akses ditolak: Hanya Super Admin yang diizinkan" });
+  }
+
   try {
     const { id_karyawan } = req.body;
 
@@ -169,6 +194,10 @@ export const restoreKaryawan = async (req, res) => {
 
 // --- DELETE PERMANENT ---
 export const deletePermanentKaryawan = async (req, res) => {
+  if (req.user?.role !== "Super Admin") {
+    return res.status(403).json({ error: "Akses ditolak: Hanya Super Admin yang diizinkan" });
+  }
+
   try {
     const { id_karyawan } = req.body;
 

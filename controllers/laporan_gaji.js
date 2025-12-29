@@ -7,6 +7,10 @@ const getLaporanGaji = async (req, res) => {
   console.log("===== Controller getLaporanGaji terpanggil! =====");
 
   try {
+    if (req.user?.role !== "Super Admin") {
+      return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
+    
     const { bulan } = req.query;
 
     const current = bulan ? new Date(bulan + "-01") : new Date();

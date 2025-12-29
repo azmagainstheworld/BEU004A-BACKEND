@@ -29,6 +29,11 @@ export const getAllDeliveryFee = async (req, res) => {
 
 // ======================== INSERT (DENGAN TRANSAKSI) ========================
 export const insertDeliveryFee = async (req, res) => {
+    const role = req.user?.role;
+    if (role !== "Super Admin" && role !== "Admin") {
+        return res.status(403).json({ error: "Akses ditolak: Anda tidak memiliki izin untuk menambah data" });
+    }
+    
     let conn;
     try {
         const { nominal } = req.body;
@@ -76,6 +81,9 @@ export const insertDeliveryFee = async (req, res) => {
 export const editDeliveryFee = async (req, res) => {
     let conn;
     try {
+        if (req.user?.role !== "Super Admin") {
+       return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
         const { id_input_deliveryfee, nominal } = req.body;
         const numericNominal = Number(String(nominal).replace(/\./g, ""));
 
@@ -142,6 +150,9 @@ export const editDeliveryFee = async (req, res) => {
 export const deleteDeliveryFee = async (req, res) => {
     let conn;
     try {
+        if (req.user?.role !== "Super Admin") {
+       return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
         const { id_input_deliveryfee } = req.body;
 
         conn = await pool.getConnection();
@@ -191,6 +202,9 @@ export const deleteDeliveryFee = async (req, res) => {
 // ======================== GET TRASH ========================
 export const getTrashDeliveryFee = async (req, res) => {
     try {
+        if (req.user?.role !== "Super Admin") {
+       return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
         const [results] = await pool.query(
             "SELECT * FROM input_deliveryfee WHERE status = 'deleted' ORDER BY tanggal DESC"
         );
@@ -205,6 +219,9 @@ export const getTrashDeliveryFee = async (req, res) => {
 export const restoreDeliveryFee = async (req, res) => {
     let conn;
     try {
+        if (req.user?.role !== "Super Admin") {
+       return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
         const { id_input_deliveryfee } = req.body;
 
         conn = await pool.getConnection();
@@ -255,6 +272,9 @@ export const restoreDeliveryFee = async (req, res) => {
 export const deletePermanentDeliveryFee = async (req, res) => {
     let conn;
     try {
+        if (req.user?.role !== "Super Admin") {
+       return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
         const { id_input_deliveryfee } = req.body;
 
         conn = await pool.getConnection();

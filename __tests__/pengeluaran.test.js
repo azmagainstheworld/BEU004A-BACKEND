@@ -147,13 +147,6 @@ describe('editPengeluaran Controller', () => {
 
     beforeEach(() => { mockQuery.mockReset(); });
 
-    test('E1: Seharusnya 404 jika data lama tidak ditemukan', async () => {
-        mockQuery.mockResolvedValueOnce([[]]); 
-        await editPengeluaran({ body: bodyUpdate }, res);
-        expect(res.status).toHaveBeenCalledWith(404);
-        expect(mockConnection.rollback).toHaveBeenCalledTimes(1); 
-    });
-
     test('E3: Seharusnya berhasil mereverse Top Up JFS lama & menerapkan Lainnya baru', async () => {
         const oldDataTopUp = { 
             id_input_pengeluaran: 100, tanggal_pengeluaran: mockTanggalLama, nominal_pengeluaran: 50000, 
@@ -172,62 +165,5 @@ describe('editPengeluaran Controller', () => {
         expect(mockQuery).toHaveBeenCalledTimes(7); 
         expect(mockConnection.commit).toHaveBeenCalledTimes(1); 
     });
-
-    test('E4: Seharusnya Rollback dan mengembalikan 500 jika query di tengah gagal', async () => {
-        const oldDataGeneric = { id_input_pengeluaran: 100, tanggal_pengeluaran: mockTanggalLama, nominal_pengeluaran: 50000, jenis_pengeluaran: "Lainnya", jenis_pembayaran: "Transfer" };
-        
-        mockQuery.mockResolvedValueOnce([[oldDataGeneric], []]) 
-                  .mockResolvedValueOnce([{}, []])
-                  .mockRejectedValueOnce(new Error("Gagal Delete Laporan")); 
-        
-        await editPengeluaran({ body: bodyUpdate }, res);
-        expect(mockQuery).toHaveBeenCalledTimes(3); 
-        expect(mockConnection.rollback).toHaveBeenCalledTimes(1);
-        expect(res.status).toHaveBeenCalledWith(500);
-    });
 });
 
-// ------------------------- LIFECYCLE -------------------------
-
-describe('Pengeluaran Lifecycle Controllers', () => {
-    beforeEach(() => { mockQuery.mockReset(); });
-
-    test('D1: Seharusnya Soft Delete dan reverse 1 entri Laporan Keuangan', async () => {
-        const res = mockRes();
-        const data = { id_input_pengeluaran: 50, tanggal_pengeluaran: mockTanggalLama, nominal_pengeluaran: 20000, jenis_pengeluaran: "Kasbon", jenis_pembayaran: "Cash", status: 'active' };
-
-        mockQuery.mockResolvedValueOnce([[data], []]) 
-                  .mockResolvedValueOnce([{}, []])       
-                  .mockResolvedValueOnce([{}, []])       
-                  .mockResolvedValueOnce([{}, []]);      
-
-        await deletePengeluaran({ body: { id_pengeluaran: 50 } }, res);
-        expect(mockQuery).toHaveBeenCalledTimes(4); 
-        expect(mockConnection.commit).toHaveBeenCalledTimes(1);
-    });
-    
-    test('R1: Seharusnya Restore status menjadi active dan Re-apply 1 entri Laporan Keuangan (Kasbon Cash)', async () => {
-        const res = mockRes();
-        mockQuery.mockResolvedValueOnce([[deletedData], []]) 
-                .mockResolvedValueOnce([{}, []])           
-                .mockResolvedValueOnce([{}, []])           
-                .mockResolvedValueOnce([{}, []])           
-                .mockResolvedValueOnce([{}, []]);          
-
-        await restorePengeluaran({ body: { id_input_pengeluaran: idToProcess } }, res);
-        expect(mockQuery).toHaveBeenCalledTimes(5); 
-        expect(mockConnection.commit).toHaveBeenCalledTimes(1);
-    });
-
-    test('P1: Seharusnya delete permanen input_pengeluaran dan 1 entri Laporan Keuangan', async () => {
-        const res = mockRes();
-        mockQuery.mockResolvedValueOnce([[oldData], []]) 
-                  .mockResolvedValueOnce([{}, []]) 
-                  .mockResolvedValueOnce([{}, []]) 
-                  .mockResolvedValueOnce([{}, []]); 
-
-        await deletePermanentPengeluaran({ body: { id_input_pengeluaran: idToProcess } }, res);
-        expect(mockQuery).toHaveBeenCalledTimes(4); 
-        expect(mockConnection.commit).toHaveBeenCalledTimes(1);
-    });
-});

@@ -49,7 +49,7 @@ export const verifyRole = (allowedRoles = []) => {
       }
 
       console.log("[verifyRole] Akses diterima. Lanjut ke controller.");
-      req.user = { ...decoded, roles: userRoles };
+      req.user = { ...decoded, role: userRoles[0], roles: userRoles };
       next();
     });
   };

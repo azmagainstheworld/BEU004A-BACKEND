@@ -14,6 +14,12 @@ function getLocalTime() {
 }
 
 export const getAllPresensi = async (req, res) => {
+  const role = req.user?.role;
+  
+  if (role !== "Super Admin" && role !== "Admin") {
+    return res.status(403).json({ error: "Akses ditolak: Hanya Admin dan Super Admin yang diizinkan" });
+  }
+
   try {
     const [results] = await pool.query(`
       SELECT 
@@ -31,6 +37,11 @@ export const getAllPresensi = async (req, res) => {
 };
 
 export const insertPresensi = async (req, res) => {
+  const role = req.user?.role;
+  if (role !== "Super Admin" && role !== "Admin") {
+    return res.status(403).json({ error: "Akses ditolak: Hanya Admin dan Super Admin yang diizinkan" });
+  }
+
   const { id_karyawan, kehadiran } = req.body;
   if (!id_karyawan || !kehadiran)
     return res.status(400).json({ message: "id_karyawan dan kehadiran wajib diisi" });
@@ -75,6 +86,10 @@ export const insertPresensi = async (req, res) => {
 };
 
 export const editPresensi = async (req, res) => {
+  if (req.user?.role !== "Super Admin") {
+  return res.status(403).json({ error: "Akses ditolak: Hanya Super Admin yang diizinkan mengedit presensi" });
+}
+
   const { id_presensi, kehadiran } = req.body;
 
   if (!id_presensi || !kehadiran) {

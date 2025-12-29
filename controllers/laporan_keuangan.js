@@ -1,6 +1,16 @@
 import pool from "../config/dbconfig.js";
 
 export const getLaporanKeuangan = async (req, res) => {
+  const userRoles = req.user?.roles || [];
+  const isAuthorized = userRoles.some(r => {
+    const roleClean = r.replace(/\s+/g, '').toLowerCase();
+    return roleClean === "superadmin" || roleClean === "admin";
+  });
+
+  if (!isAuthorized) {
+    return res.status(403).json({ error: "Akses ditolak: Hanya Admin dan Super Admin yang diizinkan" });
+  }
+  
   try {
     const [rows] = await pool.query(`
       SELECT 

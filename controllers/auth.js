@@ -3,7 +3,6 @@ import bcrypt from "bcrypt";
 import pool from "../config/dbconfig.js";
 import { sendEmail } from "../utils/sendEmail.js";
 
-/* REQUEST RESET PASSWORD*/
 /* REQUEST RESET PASSWORD */
 export const requestResetPassword = async (req, res) => {
   const { email } = req.body;
@@ -60,102 +59,7 @@ export const requestResetPassword = async (req, res) => {
   }
 };
 
-// export const requestResetPassword = async (req, res) => {
-//   const { email } = req.body;
 
-//   try {
-//     const [rows] = await pool.query(
-//       "SELECT * FROM user_jntcargobeu004a WHERE email = ?",
-//       [email]
-//     );
-
-//     if (rows.length === 0) {
-//       return res.status(404).json({ message: "Email tidak terdaftar" });
-//     }
-
-//     const user = rows[0];    
-//     const userId = user.id_user_jntcargobeu004a;
-
-//     const token = crypto.randomBytes(32).toString("hex");
-//     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 menit
-
-//     await pool.query(
-//       `INSERT INTO reset_password_tokens (id_user_jntcargobeu004a, token, expires_at) 
-//        VALUES (?, ?, ?)`,
-//       [userId, token, expiresAt]
-//     );
-
-//     // --- KODE BARU DISINI ---
-//     const link = `https://beu-004-a.vercel.app/reset-password?token=${token}`;
-    
-//     // Pastikan menggunakan format HTML agar link bisa diklik di email
-//     const htmlContent = `
-//       <p>Anda menerima email ini karena Anda (atau orang lain) telah meminta reset password untuk akun Anda.</p>
-//       <p>Silakan klik link di bawah ini untuk mengatur ulang password Anda:</p>
-//       <a href="${link}" style="background-color: #006400; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password Sekarang</a>
-//       <p>Link ini akan kedaluwarsa dalam 15 menit.</p>
-//     `;
-
-//     // Panggil fungsi sendEmail (pastikan utils/sendEmail.js sudah diupdate ke port 587)
-//     await sendEmail(email, "Reset Password J&T Cargo", htmlContent);
-
-//     // Respon sukses ke Frontend
-//     return res.json({ message: "Link reset password telah dikirim ke email Anda" });
-
-//   } catch (error) {
-//     console.error("Error di requestResetPassword:", error);
-//     return res.status(500).json({ message: "Gagal mengirim email. Silakan coba lagi nanti." });
-//   }
-// };
-// export const requestResetPassword = async (req, res) => {
-//   const { email } = req.body;
-
-//   try {
-//     // Cek apakah email ada di tabel
-//     const [rows] = await pool.query(
-//       "SELECT * FROM user_jntcargobeu004a WHERE email = ?",
-//       [email]
-//     );
-
-//     if (rows.length === 0) {
-//       return res.status(404).json({ message: "Email tidak terdaftar" });
-//     }
-
-//     const user = rows[0];    
-//     const userId = user.id_user_jntcargobeu004a;
-
-//     // Generate token
-//     const token = crypto.randomBytes(32).toString("hex");
-//     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 menit
-
-//     // Simpan token ke tabel reset_password_tokens
-//     await pool.query(
-//       `INSERT INTO reset_password_tokens (id_user_jntcargobeu004a, token, expires_at) 
-//        VALUES (?, ?, ?)`,
-//       [userId, token, expiresAt]
-//     );
-
-//     // Kirim email berisi link reset password
-//     const link = `https://beu-004-a.vercel.app/reset-password?token=${token}`;
-
-//     await sendEmail(
-//       email,
-//       "Reset Password Anda",
-//       `
-//         <h2>Permintaan Reset Password</h2>
-//         <p>Klik link berikut untuk mengatur ulang password Anda:</p>
-//         <a href="${link}">${link}</a>
-//         <p>Link berlaku hanya 15 menit.</p>
-//       `
-//     );
-
-//     return res.json({ message: "Link reset password telah dikirim ke email" });
-
-//   } catch (error) {
-//     console.error(error);
-//     return res.status(500).json({ message: "Terjadi kesalahan server" });
-//   }
-// };
 
 export const checkResetToken = async (req, res) => {
   const { token } = req.query;

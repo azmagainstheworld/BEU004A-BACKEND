@@ -5,6 +5,10 @@ import pool from "../config/dbconfig.js";
 ================================ */
 export const getAllManajemenGaji = async (req, res) => {
   try {
+    if (req.user?.role !== "Super Admin") {
+      return res.status(403).json({ error: "Akses ditolak: Hanya Super Admin yang diizinkan" });
+    }
+
     const query = `
       SELECT 
         k.id_karyawan,
@@ -29,6 +33,10 @@ export const getAllManajemenGaji = async (req, res) => {
 
 export const saveManajemenGaji = async (req, res) => {
   try {
+    if (req.user?.role !== "Super Admin") {
+      return res.status(403).json({ error: "Akses ditolak: Hanya Super Admin yang diizinkan" });
+    }
+    
     const { id_karyawan, upah_perhari, bonus } = req.body;
 
     if (!id_karyawan || !upah_perhari) {

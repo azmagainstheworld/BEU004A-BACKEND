@@ -65,6 +65,16 @@ export const getAllPengeluaran = async (req, res) => {
 // INSERT 
 
 export const insertPengeluaran = async (req, res) => {
+    const userRoles = req.user?.roles || [];
+    const isAuthorized = userRoles.some(r => {
+        const roleClean = r.replace(/\s+/g, '').toLowerCase();
+        return roleClean === "superadmin" || roleClean === "admin";
+    });
+
+    if (!isAuthorized) {
+        return res.status(403).json({ error: "Akses ditolak: Hanya Admin dan Super Admin yang diizinkan" });
+    }
+    
     const conn = await pool.getConnection(); // ambil koneksi
     await conn.beginTransaction(); // Mulai transaksi
 
@@ -143,6 +153,9 @@ export const editPengeluaran = async (req, res) => {
     await conn.beginTransaction();
 
     try {
+        if (req.user?.role !== "Super Admin") {
+       return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
         const { id_pengeluaran, nominal_pengeluaran, jenis_pengeluaran, jenis_pembayaran, deskripsi, id_karyawan } = req.body;
 
         const nominalParsed = parseNominal(nominal_pengeluaran);
@@ -208,6 +221,9 @@ export const deletePengeluaran = async (req, res) => {
     await conn.beginTransaction(); // Mulai transaksi
 
     try {
+        if (req.user?.role !== "Super Admin") {
+       return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
         const { id_pengeluaran } = req.body;
         
         // 1. Ambil data lama dan pastikan status 'active' (Gunakan conn.query)
@@ -247,6 +263,9 @@ export const deletePengeluaran = async (req, res) => {
 
 export const getTrashPengeluaran = async (req, res) => {
     try {
+        if (req.user?.role !== "Super Admin") {
+       return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
         const [rows] = await pool.query(`SELECT * FROM input_pengeluaran WHERE status = 'deleted' ORDER BY tanggal_pengeluaran DESC`);
         res.status(200).json(rows); 
     } catch (err) {
@@ -262,6 +281,9 @@ export const restorePengeluaran = async (req, res) => {
     await conn.beginTransaction();
 
     try {
+        if (req.user?.role !== "Super Admin") {
+       return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
         const { id_input_pengeluaran } = req.body;
 
         const [[data]] = await conn.query(`SELECT * FROM input_pengeluaran WHERE id_input_pengeluaran = ? AND status = 'deleted'`, [id_input_pengeluaran]);
@@ -301,6 +323,10 @@ export const deletePermanentPengeluaran = async (req, res) => {
     await conn.beginTransaction();
 
     try {
+        if (req.user?.role !== "Super Admin") {
+       return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
+
         const { id_input_pengeluaran } = req.body;
 
         const [[data]] = await conn.query(`SELECT * FROM input_pengeluaran WHERE id_input_pengeluaran = ?`, [id_input_pengeluaran]);

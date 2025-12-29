@@ -77,6 +77,16 @@ export const getAllOutgoing = async (req, res) => {
 };
 
 export const insertOutgoing = async (req, res) => {
+  const userRoles = req.user?.roles || [];
+  const isAuthorized = userRoles.some(r => {
+    const roleClean = r.replace(/\s+/g, '').toLowerCase();
+    return roleClean === "superadmin" || roleClean === "admin";
+  });
+
+  if (!isAuthorized) {
+    return res.status(403).json({ error: "Akses ditolak: Hanya Admin dan Super Admin yang diizinkan" });
+  }
+  
   const conn = await pool.getConnection();
   await conn.beginTransaction();
 
@@ -146,13 +156,16 @@ VALUES (?, 'Saldo JFS', ?)`,
   }
 };
 
-// input_outgoing.js
 
 export const editOutgoing = async (req, res) => {
   const conn = await pool.getConnection();
   await conn.beginTransaction();
 
   try {
+        if (req.user?.role !== "Super Admin") {
+      return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
+
     const { id_input_outgoing, nominal, potongan, jenis_pembayaran } = req.body;
 
     const [[old]] = await conn.query("SELECT * FROM input_outgoing WHERE id_input_outgoing = ?", [id_input_outgoing]);
@@ -226,6 +239,10 @@ export const deleteOutgoing = async (req, res) => {
   await conn.beginTransaction();
 
   try {
+  if (req.user?.role !== "Super Admin") {
+    return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
+
     const { id_input_outgoing } = req.body;
     
     // 1. Ambil data lama dan pastikan status 'active'
@@ -268,52 +285,59 @@ export const deleteOutgoing = async (req, res) => {
 
 // GET TRASH 
 export const getTrashOutgoing = async (req, res) => {
-    try {
-        const [results] = await pool.query(
-            "SELECT * FROM input_outgoing WHERE status = 'deleted' ORDER BY tanggal_outgoing DESC"
-        );
-        res.json(results);
-    } catch (err) {
-        console.error("Error fetching trash outgoing:", err);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
+  try {
+    if (req.user?.role !== "Super Admin") {
+       return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
+    const [results] = await pool.query(
+      "SELECT * FROM input_outgoing WHERE status = 'deleted' ORDER BY tanggal_outgoing DESC"
+    );
+    res.json(results);
+  } catch (err) {
+    console.error("Error fetching trash outgoing:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 };
 
 // RESTORE (PUT /outgoing/restore)
 export const restoreOutgoing = async (req, res) => {
-    const conn = await pool.getConnection();
-    await conn.beginTransaction();
+  const conn = await pool.getConnection();
+  await conn.beginTransaction();
+  
+  try {
+    if (req.user?.role !== "Super Admin") {
+       return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
+    
+    const { id_input_outgoing } = req.body;
 
-    try {
-        const { id_input_outgoing } = req.body;
-
-        // 1. Ambil data lama dan pastikan status 'deleted'
-        const [[data]] = await conn.query("SELECT * FROM input_outgoing WHERE id_input_outgoing = ? AND status = 'deleted'", [id_input_outgoing]);
-        if (!data) return res.status(404).json({ error: "Data not found or already active" });
-
-        // 2. Restore: Update status menjadi 'active'
-        await conn.query("UPDATE input_outgoing SET status = 'active' WHERE id_input_outgoing = ?", [id_input_outgoing]);
+    // 1. Ambil data lama dan pastikan status 'deleted'
+    const [[data]] = await conn.query("SELECT * FROM input_outgoing WHERE id_input_outgoing = ? AND status = 'deleted'", [id_input_outgoing]);
+    if (!data) return res.status(404).json({ error: "Data not found or already active" });
+    
+    // 2. Restore: Update status menjadi 'active'
+    await conn.query("UPDATE input_outgoing SET status = 'active' WHERE id_input_outgoing = ?", [id_input_outgoing]);
+    
+    // --- Terapkan kembali transaksi di laporan_keuangan (INSERT entri) ---
         
-        // --- Terapkan kembali transaksi di laporan_keuangan (INSERT entri) ---
-        
-        const { laporanValue } = normalizeJenisPembayaran(data.jenis_pembayaran);
-        const nominalBersih = data.nominal_bersih;
-        const potonganJFS = nominalBersih * 0.6;
-        const tanggal = data.tanggal_outgoing; // Gunakan tanggal aslinya
+    const { laporanValue } = normalizeJenisPembayaran(data.jenis_pembayaran);
+    const nominalBersih = data.nominal_bersih;
+    const potonganJFS = nominalBersih * 0.6;
+    const tanggal = data.tanggal_outgoing; // Gunakan tanggal aslinya
 
-        // 3. Insert kembali laporan keuangan pemasukan (kas/transfer)
-        if (laporanValue) {
-            await conn.query(
-                `INSERT INTO laporan_keuangan (tanggal, jenis_transaksi, nominal) VALUES (?, ?, ?)`,
-                [tanggal, laporanValue, nominalBersih]
-            );
-        }
+    // 3. Insert kembali laporan keuangan pemasukan (kas/transfer)
+    if (laporanValue) {
+      await conn.query(
+        `INSERT INTO laporan_keuangan (tanggal, jenis_transaksi, nominal) VALUES (?, ?, ?)`,
+        [tanggal, laporanValue, nominalBersih]
+      );
+    }
 
-        // 4. Insert kembali Saldo JFS (negatif)
-        await conn.query(
-            `INSERT INTO laporan_keuangan (tanggal, jenis_transaksi, nominal) VALUES (?, 'Saldo JFS', ?)`,
-            [tanggal, -potonganJFS]
-        );
+    // 4. Insert kembali Saldo JFS (negatif)
+    await conn.query(
+      `INSERT INTO laporan_keuangan (tanggal, jenis_transaksi, nominal) VALUES (?, 'Saldo JFS', ?)`,
+      [tanggal, -potonganJFS]
+    );
 
         // 5. Insert kembali log (DELETE dulu untuk mencegah duplikat)
         await conn.query(`DELETE FROM log_input_dashboard WHERE id_input_outgoing = ?`, [id_input_outgoing]);
@@ -335,6 +359,9 @@ export const deletePermanentOutgoing = async (req, res) => {
     await conn.beginTransaction();
 
     try {
+      if (req.user?.role !== "Super Admin") {
+       return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
+    }
         const { id_input_outgoing } = req.body;
         
         // 1. Ambil data lama (DIPERBAIKI UNTUK MENGHINDARI TypeError)
@@ -345,17 +372,6 @@ export const deletePermanentOutgoing = async (req, res) => {
             await conn.rollback();
             return res.status(404).json({ error: "Data not found" });
         }
-// ======================== DELETE PERMANEN (DELETE /outgoing/delete-permanent) ========================
-// export const deletePermanentOutgoing = async (req, res) => {
-//     const conn = await pool.getConnection();
-//     await conn.beginTransaction();
-
-//     try {
-//         const { id_input_outgoing } = req.body;
-//         
-//         // 1. Ambil data lama
-//         const [[data]] = await conn.query("SELECT * FROM input_outgoing WHERE id_input_outgoing = ?", [id_input_outgoing]);
-//         if (!data) return res.status(404).json({ error: "Data not found" });
 
         // 2. Reverse transaksi di laporan_keuangan (Hard Delete entri)
         const { laporanValue: laporanOld } = normalizeJenisPembayaran(data.jenis_pembayaran);
