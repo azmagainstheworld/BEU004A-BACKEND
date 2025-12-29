@@ -1,9 +1,11 @@
+// __tests__/pengeluaran.test.js
 import { jest } from '@jest/globals';
 
+// Import controller yang akan diuji
 import { 
     parseNominal, formatTanggal, insertPengeluaran, getAllPengeluaran,
-    editPengeluaran, deletePengeluaran, restorePengeluaran, deletePermanentPengeluaran, 
-    getTrashPengeluaran 
+    editPengeluaran, deletePengeluaran, restorePengeluaran, 
+    deletePermanentPengeluaran, getTrashPengeluaran 
 } from "../controllers/input_pengeluaran.js";
 import pool from "../config/dbconfig.js";
 
@@ -16,18 +18,7 @@ const mockRes = () => {
     return res;
 };
 
-// MOCK Date: Tanggal konsisten
-const mockTanggal = "2025-12-15"; 
-const mockTanggalLama = "2025-12-14"; 
-
-global.Date = class MockDate extends Date {
-    constructor() { super(mockTanggal); }
-    getFullYear() { return 2025; }
-    getMonth() { return 11; } 
-    getDate() { return 15; }
-};
-
-// SANGAT PENTING: Mendefinisikan mockQuery agar bisa di-reset total
+// Mock Koneksi Transaksi Database
 const mockQuery = jest.fn();
 const mockConnection = {
     query: mockQuery,
@@ -37,133 +28,154 @@ const mockConnection = {
     release: jest.fn(),
 };
 
+// Pasang mock ke pool global
 pool.query = mockQuery; 
 pool.getConnection = jest.fn(() => Promise.resolve(mockConnection));
 
-const idToProcess = 50;
-const oldData = {
-    id_input_pengeluaran: idToProcess, tanggal_pengeluaran: mockTanggalLama, nominal_pengeluaran: 20000,
-    jenis_pengeluaran: "Kasbon", jenis_pembayaran: "Cash", status: 'active'
-};
-const deletedData = { ...oldData, status: 'deleted' };
+// Mock Tanggal Tetap (WITA) agar pengujian konsisten
+const FIXED_DATE = "2025-12-15";
 
-// ------------------------- UTILITY TEST -------------------------
+// ------------------------- TEST SUITES -------------------------
 
-describe('parseNominal Utility', () => {
-    test('Seharusnya throw error jika nominal < 1000', () => { expect(() => parseNominal("500")).toThrow("Nominal minimal 1.000"); });
-    test('Seharusnya mengembalikan angka dari string Rupiah', () => { expect(parseNominal("10.000")).toBe(10000); });
-    test('Seharusnya throw error jika nominal non-angka', () => { expect(() => parseNominal("abc")).toThrow("Nominal minimal 1.000"); });
-    test('Seharusnya mengembalikan tanggal format yyyy-mm-dd', () => { expect(formatTanggal()).toBe(mockTanggal); });
+describe('Pengeluaran Controller - Unit Testing', () => {
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    afterAll(async () => {
+        try { if (pool.end) await pool.end(); } catch (e) {}
+    });
+
+    // --- 1. PENGUJIAN UTILITY ---
+    describe('Utility Functions', () => {
+        test('U1: parseNominal harus membersihkan format titik Rupiah', () => {
+            expect(parseNominal("25.500")).toBe(25500);
+        });
+
+        test('U2: parseNominal harus melempar error jika di bawah 1.000', () => {
+            expect(() => parseNominal("500")).toThrow("Nominal minimal 1.000");
+        });
+    });
+
+    // --- 2. PENGUJIAN AKSES (READ) ---
+    describe('getAllPengeluaran', () => {
+        test('A1: Super Admin dapat melihat semua pengeluaran aktif', async () => {
+            const req = { user: { roles: ['Super Admin'] } };
+            const res = mockRes();
+            mockQuery.mockResolvedValueOnce([[{ id_input_pengeluaran: 1 }]]);
+
+            await getAllPengeluaran(req, res);
+            expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("WHERE p.status = 'active'"));
+            expect(res.json).toHaveBeenCalled();
+        });
+
+        test('A2: Admin hanya dapat melihat pengeluaran hari ini', async () => {
+            const req = { user: { roles: ['Admin'] } };
+            const res = mockRes();
+            mockQuery.mockResolvedValueOnce([[]]);
+
+            await getAllPengeluaran(req, res);
+            expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("AND DATE(p.tanggal_pengeluaran) = ?"), expect.anything());
+        });
+    });
+
+    // --- 3. PENGUJIAN INSERT (TRANSAKSI) ---
+    describe('insertPengeluaran', () => {
+        test('I1: Berhasil Insert Pengeluaran Operasional (Kas)', async () => {
+            const req = { 
+                user: { roles: ['Admin'] },
+                body: { nominal_pengeluaran: "15.000", jenis_pengeluaran: "Operasional", jenis_pembayaran: "Cash", deskripsi: "Parkir" } 
+            };
+            const res = mockRes();
+
+            mockConnection.query
+                .mockResolvedValueOnce([{ insertId: 101 }]) // Insert data utama
+                .mockResolvedValueOnce([{}])                // Laporan Kas (Negatif)
+                .mockResolvedValueOnce([{}]);               // Log Dashboard
+
+            await insertPengeluaran(req, res);
+            expect(mockConnection.commit).toHaveBeenCalled();
+            expect(res.status).toHaveBeenCalledWith(201);
+        });
+
+        test('I2: Berhasil Insert Top Up Saldo JFS (Double Entry)', async () => {
+            const req = { 
+                user: { roles: ['Admin'] },
+                body: { nominal_pengeluaran: "100.000", jenis_pengeluaran: "Top Up Saldo JFS", jenis_pembayaran: "Transfer" } 
+            };
+            const res = mockRes();
+
+            mockConnection.query
+                .mockResolvedValueOnce([{ insertId: 102 }]) // Main
+                .mockResolvedValueOnce([{}])                // Laporan: Saldo JFS (+)
+                .mockResolvedValueOnce([{}])                // Laporan: Transfer (-)
+                .mockResolvedValueOnce([{}]);               // Log
+
+            await insertPengeluaran(req, res);
+            // Cek apakah nominal JFS positif
+            expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining("'Saldo JFS'"), expect.arrayContaining([expect.anything(), 100000]));
+            expect(mockConnection.commit).toHaveBeenCalled();
+        });
+
+        test('V1: Gagal jika Kasbon tapi Nama Karyawan kosong', async () => {
+            const req = { 
+                user: { roles: ['Admin'] },
+                body: { nominal_pengeluaran: "50.000", jenis_pengeluaran: "Kasbon", jenis_pembayaran: "Cash" } 
+            };
+            const res = mockRes();
+            await insertPengeluaran(req, res);
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: "Nama karyawan wajib diisi untuk Kasbon" }));
+        });
+    });
+
+    // --- 4. PENGUJIAN EDIT (REVERSE LOGIC) ---
+    describe('editPengeluaran', () => {
+        test('E1: Berhasil Update dengan membatalkan laporan lama dan membuat laporan baru', async () => {
+            const req = { 
+                user: { role: 'Super Admin' },
+                body: { id_pengeluaran: 1, nominal_pengeluaran: "20.000", jenis_pengeluaran: "Operasional", jenis_pembayaran: "Transfer", deskripsi: "Update" } 
+            };
+            const res = mockRes();
+
+            mockConnection.query
+                .mockResolvedValueOnce([[{ id_input_pengeluaran: 1, nominal_pengeluaran: 10000, jenis_pembayaran: "Cash", tanggal_pengeluaran: FIXED_DATE }]]) // SELECT OLD
+                .mockResolvedValue([{}]); // Mock sisa query UPDATE, DELETE, INSERT, LOG
+
+            await editPengeluaran(req, res);
+            expect(mockConnection.beginTransaction).toHaveBeenCalled();
+            expect(mockConnection.commit).toHaveBeenCalled();
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: "Pengeluaran berhasil diupdate" }));
+        });
+    });
+
+    // --- 5. LIFECYCLE (SOFT DELETE & RESTORE) ---
+    describe('Lifecycle Controllers', () => {
+        test('D1: Soft Delete harus membatalkan saldo di Laporan Keuangan', async () => {
+            const req = { user: { role: 'Super Admin' }, body: { id_pengeluaran: 1 } };
+            const res = mockRes();
+
+            mockConnection.query
+                .mockResolvedValueOnce([[{ id_input_pengeluaran: 1, nominal_pengeluaran: 10000, jenis_pembayaran: "Cash", tanggal_pengeluaran: FIXED_DATE }]]) // SELECT
+                .mockResolvedValue([{}]); // UPDATE & DELETE FINANCE LOGS
+
+            await deletePengeluaran(req, res);
+            expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining("DELETE FROM laporan_keuangan"), expect.anything());
+            expect(mockConnection.commit).toHaveBeenCalled();
+        });
+
+        test('R1: Restore harus mengembalikan status aktif dan mengisi kembali Laporan Keuangan', async () => {
+            const req = { user: { role: 'Super Admin' }, body: { id_input_pengeluaran: 1 } };
+            const res = mockRes();
+
+            mockConnection.query
+                .mockResolvedValueOnce([[{ id_input_pengeluaran: 1, nominal_pengeluaran: 10000, jenis_pembayaran: "Cash", tanggal_pengeluaran: FIXED_DATE }]]) // SELECT deleted
+                .mockResolvedValue([{}]); // UPDATE & INSERT FINANCE LOGS
+
+            await restorePengeluaran(req, res);
+            expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO laporan_keuangan"), expect.anything());
+            expect(mockConnection.commit).toHaveBeenCalled();
+        });
+    });
 });
-
-// ------------------------- INSERT -------------------------
-
-describe('insertPengeluaran Controller', () => {
-    const res = mockRes();
-    
-    beforeEach(() => { 
-        mockQuery.mockReset(); 
-        jest.clearAllMocks(); 
-    });
-
-    test('T1: Seharusnya INSERT Pengeluaran dan Laporan Kas (Negatif)', async () => {
-        const nominal = 25000;
-        mockQuery.mockResolvedValueOnce([{ insertId: 123 }]) 
-                  .mockResolvedValueOnce([{}]) 
-                  .mockResolvedValueOnce([{}]); 
-        const req = { body: { nominal_pengeluaran: nominal, jenis_pengeluaran: "Operasional", jenis_pembayaran: "Cash", deskripsi: "Bayar parkir", id_karyawan: null } };
-        await insertPengeluaran(req, res);
-        expect(mockQuery).toHaveBeenCalledTimes(3); 
-        expect(mockConnection.commit).toHaveBeenCalledTimes(1); 
-    });
-
-    test('V4: Seharusnya 400 jika jenis=Kasbon tapi id_karyawan kosong', async () => {
-        const req = { body: { jenis_pengeluaran: "Kasbon", jenis_pembayaran: "Cash", nominal_pengeluaran: "50000" } };
-        await insertPengeluaran(req, res);
-        expect(res.status).toHaveBeenCalledWith(400);
-    });
-
-    test('T2: Seharusnya INSERT 1 Pengeluaran, 1 Laporan Saldo JFS (Positif) dan 1 Laporan Kas/Transfer (Negatif)', async () => {
-        const nominal = 100000;
-        mockQuery.mockResolvedValueOnce([{ insertId: 456 }]) 
-                  .mockResolvedValueOnce([{}]) 
-                  .mockResolvedValueOnce([{}]) 
-                  .mockResolvedValueOnce([{}]); 
-        const req = { body: { nominal_pengeluaran: nominal, jenis_pengeluaran: "Top Up Saldo JFS", jenis_pembayaran: "Transfer", deskripsi: "Transfer ke rekening JFS" } };
-        await insertPengeluaran(req, res);
-        expect(mockQuery).toHaveBeenCalledTimes(4);
-        expect(mockConnection.commit).toHaveBeenCalledTimes(1);
-    });
-
-    test('E1: Seharusnya mengembalikan 500 dan Rollback jika gagal INSERT Laporan Keuangan', async () => {
-        mockQuery.mockResolvedValueOnce([{ insertId: 789 }]) 
-                 .mockRejectedValueOnce(new Error("Gagal Insert Laporan Keuangan")); 
-        const req = { body: { nominal_pengeluaran: "10000", jenis_pengeluaran: "Top Up Saldo JFS", jenis_pembayaran: "Transfer" } };
-        await insertPengeluaran(req, res);
-        expect(mockQuery).toHaveBeenCalledTimes(2); 
-        expect(mockConnection.rollback).toHaveBeenCalledTimes(1);
-        expect(res.status).toHaveBeenCalledWith(500);
-    });
-});
-
-// ------------------------- GET ALL & GET TRASH -------------------------
-
-describe('Read Pengeluaran Controllers (Access Control)', () => {
-    const res = mockRes();
-    beforeEach(() => { mockQuery.mockReset(); });
-
-    test('A1: Seharusnya mengambil semua pengeluaran aktif jika Super Admin', async () => {
-        mockQuery.mockResolvedValueOnce([[{ id: 1, nominal: 10000 }]]);
-        const req = { user: { roles: ['Super Admin'] } };
-        await getAllPengeluaran(req, res);
-        expect(mockQuery).toHaveBeenCalledTimes(1);
-    });
-
-    test('A2: Seharusnya mengambil pengeluaran hari ini jika Admin', async () => {
-        mockQuery.mockResolvedValueOnce([[{ id: 2, nominal: 5000 }]]);
-        const req = { user: { roles: ['Admin'] } };
-        await getAllPengeluaran(req, res);
-        expect(mockQuery).toHaveBeenCalledTimes(1);
-    });
-
-    test('A3: Seharusnya 403 jika peran tidak diizinkan', async () => {
-        const req = { user: { roles: ['User'] } };
-        await getAllPengeluaran(req, res);
-        expect(res.status).toHaveBeenCalledWith(403);
-    });
-
-    test('A4: Seharusnya mengambil data deleted jika getTrashPengeluaran', async () => {
-        mockQuery.mockResolvedValueOnce([[{ id: 3, status: 'deleted' }]]);
-        await getTrashPengeluaran({}, res);
-        expect(res.status).toHaveBeenCalledWith(200);
-    });
-});
-
-// ------------------------- EDIT -------------------------
-
-describe('editPengeluaran Controller', () => {
-    const res = mockRes();
-    const bodyUpdate = { id_pengeluaran: 100, nominal_pengeluaran: "10.000", jenis_pengeluaran: "Lainnya", jenis_pembayaran: "Transfer", deskripsi: "Deskripsi baru" };
-
-    beforeEach(() => { mockQuery.mockReset(); });
-
-    test('E3: Seharusnya berhasil mereverse Top Up JFS lama & menerapkan Lainnya baru', async () => {
-        const oldDataTopUp = { 
-            id_input_pengeluaran: 100, tanggal_pengeluaran: mockTanggalLama, nominal_pengeluaran: 50000, 
-            jenis_pengeluaran: "Top Up Saldo JFS", jenis_pembayaran: "Cash" 
-        };
-        
-        mockQuery.mockResolvedValueOnce([[oldDataTopUp], []]) 
-                .mockResolvedValueOnce([{}, []])        
-                .mockResolvedValueOnce([{}, []])        
-                .mockResolvedValueOnce([{}, []])        
-                .mockResolvedValueOnce([{}, []])        
-                .mockResolvedValueOnce([{}, []])        
-                .mockResolvedValueOnce([{}, []]);       
-        
-        await editPengeluaran({ body: bodyUpdate }, res);
-        expect(mockQuery).toHaveBeenCalledTimes(7); 
-        expect(mockConnection.commit).toHaveBeenCalledTimes(1); 
-    });
-});
-

@@ -177,6 +177,10 @@ export const changeOwnPassword = async (req, res) => {
 
 /* SUPER ADMIN GANTI PASSWORD ORANG LAIN */
 export const changeOtherPassword = async (req, res) => {
+  if (req.user?.role !== "Super Admin") {
+    return res.status(403).json({ message: "Akses ditolak: Hanya Super Admin yang diizinkan" });
+  }
+  
   const { targetUserId, newPassword, confirmPassword } = req.body;
 
   try {

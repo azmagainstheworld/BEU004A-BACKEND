@@ -4,8 +4,6 @@ import pool from "../config/dbconfig.js";
 function pad2(n) { return String(n).padStart(2, "0"); }
 
 const getLaporanGaji = async (req, res) => {
-  console.log("===== Controller getLaporanGaji terpanggil! =====");
-
   try {
     if (req.user?.role !== "Super Admin") {
       return res.status(403).json({ error: "Forbidden: Akses hanya untuk Super Admin" });
@@ -13,13 +11,17 @@ const getLaporanGaji = async (req, res) => {
     
     const { bulan } = req.query;
 
+    // Pastikan menggunakan tanggal 1 agar perhitungan bulan tidak meleset
     const current = bulan ? new Date(bulan + "-01") : new Date();
 
     const year = current.getFullYear();
     const month = String(current.getMonth() + 1).padStart(2, "0");
 
+    // PERBAIKAN: Selalu ambil hari terakhir di bulan tersebut
+    const lastDay = new Date(year, current.getMonth() + 1, 0).getDate();
+
     const start = `${year}-${month}-01`;
-    const end = `${year}-${month}-${new Date(year, current.getMonth() + 1, 0).getDate()}`;
+    const end = `${year}-${month}-${lastDay}`; // Hasilnya akan selalu akhir bulan (30/31)
 
     console.log(`Periode: ${start} sampai ${end}`);
 

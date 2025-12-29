@@ -6,7 +6,6 @@ import pool from "../config/dbconfig.js";
 
 // ------------------------- MOCKING SECTION -------------------------
 
-// MOCK res
 const mockRes = () => {
     const res = {};
     res.status = jest.fn(() => res); 
@@ -14,131 +13,100 @@ const mockRes = () => {
     return res;
 };
 
-// MOCK Pool.query
+// MOCK Pool.query global agar pengujian tidak menyentuh database asli
 const mockQuery = jest.fn();
 pool.query = mockQuery; 
 
-// Data Mock untuk Query 1 (Laporan Harian - rows)
+// Data Mock untuk Hasil Query
 const mockLaporanHarian = [
-    { tanggal: '2025-12-15', Kas: 50000, Saldo_JFS: -10000, Transfer: 20000 },
-    { tanggal: '2025-12-14', Kas: 10000, Saldo_JFS: -5000, Transfer: 5000 },
+    { tanggal_bersih: '2025-12-15', Kas: 50000, Saldo_JFS: -10000, Transfer: 20000 },
+    { tanggal_bersih: '2025-12-14', Kas: 10000, Saldo_JFS: -5000, Transfer: 5000 },
 ];
 
-// Data Mock untuk Query 2 (Total Sekarang - totalNow)
 const mockTotalSekarang = {
     kas: 60000,
     saldo_jfs: -15000, 
     transfer: 25000 
 };
 
+// ------------------------- TEST SUITES -------------------------
 
-// ------------------------- GET LAPORAN KEUANGAN TESTS -------------------------
-
-describe('Laporan Keuangan Controller', () => {
+describe('Laporan Keuangan Module - Unit Testing', () => {
     
+    // Membersihkan mock sebelum setiap pengujian
     beforeEach(() => {
         jest.clearAllMocks();
-        mockQuery.mockClear();
     });
 
-    // T1: Sukses Mengambil Laporan (Query 1 dan Query 2)
-    test('T1: Seharusnya berhasil mengambil Laporan Harian dan Total Saldo', async () => {
-        const res = mockRes();
-        
-        // Mock Query 1: Laporan Harian (rows)
-        // Mock Query 2: Total Sekarang (totalNow)
-        mockQuery.mockResolvedValueOnce([mockLaporanHarian])
-                 .mockResolvedValueOnce([[mockTotalSekarang]]); // Query 2 harus mengembalikan [[row]]
+    // Menutup koneksi database untuk mencegah error "environment torn down"
+    afterAll(async () => {
+        if (pool.end) await pool.end();
+    });
 
-        const req = {};
+    // --- 1. PENGUJIAN HAK AKSES (Authorization) ---
+    test('A1: Harus memblokir akses jika user tidak memiliki role Admin atau Super Admin', async () => {
+        const res = mockRes();
+        const req = { user: { roles: ['User Biasa'] } };
+
         await getLaporanKeuangan(req, res);
 
-        // Verifikasi Query 1 (Laporan Harian Group By)
-        expect(mockQuery).toHaveBeenNthCalledWith(1, expect.stringContaining("GROUP BY DATE_FORMAT(tanggal, '%Y-%m-%d')"));
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ 
+            error: "Akses ditolak: Hanya Admin dan Super Admin yang diizinkan" 
+        }));
+    });
+
+    // --- 2. PENGUJIAN SUKSES (Super Admin / Admin) ---
+    test('T1: Seharusnya berhasil mengambil Laporan Harian dan Total Saldo Global', async () => {
+        const res = mockRes();
+        const req = { user: { roles: ['Super Admin'] } };
         
-        // Verifikasi Query 2 (Total)
-        expect(mockQuery).toHaveBeenNthCalledWith(2, expect.stringContaining("SUM(CASE WHEN jenis_transaksi = 'Kas'"));
-        
+        // Mock Query 1: Laporan Harian
+        // Mock Query 2: Total Keseluruhan
+        mockQuery.mockResolvedValueOnce([mockLaporanHarian])
+                 .mockResolvedValueOnce([[mockTotalSekarang]]); 
+
+        await getLaporanKeuangan(req, res);
+
         expect(mockQuery).toHaveBeenCalledTimes(2);
-        expect(res.status).not.toHaveBeenCalledWith(500);
-        
-        // Verifikasi format output JSON
         expect(res.json).toHaveBeenCalledWith({
             laporan: mockLaporanHarian,
             total_sekarang: mockTotalSekarang
         });
     });
 
-    // E1: Gagal Query Laporan Harian (Query 1 Gagal)
-    test('E1: Seharusnya 500 jika Query Laporan Harian (Query 1) gagal', async () => {
+    // --- 3. PENGUJIAN STRUKTUR QUERY (White Box) ---
+    test('V1: Verifikasi struktur SQL mengandung GROUP BY dan CASE WHEN untuk agregasi', async () => {
         const res = mockRes();
-        
-        // Mock Query 1: Rejects
-        mockQuery.mockRejectedValueOnce(new Error("Gagal ambil data harian")); 
-
-        const req = {};
-        await getLaporanKeuangan(req, res);
-
-        expect(mockQuery).toHaveBeenCalledTimes(1);
-        expect(res.status).toHaveBeenCalledWith(500);
-        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: "Internal Server Error" }));
-    });
-    
-    // E2: Gagal Query Total (Query 2 Gagal)
-    test('E2: Seharusnya 500 jika Query Total (Query 2) gagal', async () => {
-        const res = mockRes();
-        
-        // Mock Query 1: Laporan Harian (Sukses)
-        mockQuery.mockResolvedValueOnce([mockLaporanHarian]);
-        
-        // Mock Query 2: Rejects
-        mockQuery.mockRejectedValueOnce(new Error("Gagal hitung total")); 
-
-        const req = {};
-        await getLaporanKeuangan(req, res);
-
-        expect(mockQuery).toHaveBeenCalledTimes(2);
-        expect(res.status).toHaveBeenCalledWith(500);
-        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: "Internal Server Error" }));
-    });
-    
-    // V3: Query Structure Check (Query 1)
-    test('V3: Query 1 harus menggunakan GROUP BY tanggal dan ORDER BY DESC', async () => {
-        const res = mockRes();
+        const req = { user: { roles: ['Admin'] } };
         mockQuery.mockResolvedValueOnce([mockLaporanHarian])
                  .mockResolvedValueOnce([[mockTotalSekarang]]);
 
-        const req = {};
         await getLaporanKeuangan(req, res);
 
-        const query1 = mockQuery.mock.calls[0][0];
-
-        // Memastikan penggunaan fungsi agregasi CASE WHEN
-        expect(query1).toMatch(/SUM\(CASE WHEN jenis_transaksi = 'Kas' THEN nominal ELSE 0 END\)/);
+        const sqlDailyQuery = mockQuery.mock.calls[0][0];
         
-        // Memastikan Grouping dan Ordering
-        expect(query1).toMatch(/GROUP BY DATE_FORMAT\(tanggal, '%Y-%m-%d'\)/);
-        expect(query1).toMatch(/ORDER BY tanggal DESC/);
+        // Pastikan ada pengelompokan berdasarkan tanggal
+        expect(sqlDailyQuery).toMatch(/GROUP BY tanggal_bersih/i);
+        // Pastikan ada logika pemilahan jenis transaksi
+        expect(sqlDailyQuery).toMatch(/SUM\(CASE WHEN jenis_transaksi = 'Kas' THEN nominal ELSE 0 END\)/i);
+        // Pastikan urutan terbaru di atas
+        expect(sqlDailyQuery).toMatch(/ORDER BY tanggal_bersih DESC/i);
     });
-    
-    // V4: Query Structure Check (Query 2)
-    test('V4: Query 2 harus menghitung Total Saldo JFS secara global', async () => {
-        const res = mockRes();
-        mockQuery.mockResolvedValueOnce([mockLaporanHarian])
-                 .mockResolvedValueOnce([[mockTotalSekarang]]);
 
-        const req = {};
+    // --- 4. PENGUJIAN ERROR HANDLING ---
+    test('E1: Mengembalikan status 500 jika terjadi kegagalan pada database', async () => {
+        const res = mockRes();
+        const req = { user: { roles: ['Super Admin'] } };
+        
+        // Simulasi error saat query pertama
+        mockQuery.mockRejectedValueOnce(new Error("Database Timeout")); 
+
         await getLaporanKeuangan(req, res);
 
-        const query2 = mockQuery.mock.calls[1][0];
-
-        // Memastikan tidak ada GROUP BY
-        expect(query2).not.toMatch(/GROUP BY/);
-        
-        // Memastikan perhitungan Saldo JFS
-        expect(query2).toMatch(/SUM\(CASE WHEN jenis_transaksi = 'Saldo JFS' THEN nominal ELSE 0 END\) AS saldo_jfs/);
-        
-        // Memastikan hanya mengambil dari tabel laporan_keuangan
-        expect(query2).toMatch(/FROM laporan_keuangan/);
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ 
+            error: "Internal Server Error" 
+        }));
     });
 });

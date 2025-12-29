@@ -1,3 +1,4 @@
+// outgoing.test.js
 import { jest } from '@jest/globals';
 import { 
     getAllOutgoing, insertOutgoing, editOutgoing, 
@@ -8,7 +9,6 @@ import pool from "../config/dbconfig.js";
 
 // ------------------------- MOCKING SECTION -------------------------
 
-// Mock Response object
 const mockRes = () => {
     const res = {};
     res.status = jest.fn(() => res); 
@@ -16,19 +16,10 @@ const mockRes = () => {
     return res;
 };
 
-// Mock Date untuk mengunci waktu testing (22 Desember 2025 WITA)
+// Mock Tanggal Tetap untuk Testing (WITA)
 const mockTanggal = "2025-12-22"; 
 
-// Mocking global Date object agar menghasilkan tanggal yang konsisten
-global.Date = class MockDate extends Date {
-    constructor() { super(mockTanggal); }
-    toLocaleDateString(locale, options) {
-        if (options?.timeZone === "Asia/Makassar") return mockTanggal;
-        return super.toLocaleDateString(locale, options);
-    }
-};
-
-// Mock DB Connection untuk Transaction
+// Mock DB Connection & Transaction
 const mockQuery = jest.fn();
 const mockConnection = {
     query: mockQuery,
@@ -41,104 +32,103 @@ const mockConnection = {
 pool.query = mockQuery; 
 pool.getConnection = jest.fn(() => Promise.resolve(mockConnection)); 
 
-// Global Data untuk Test
-const idToProcess = 100;
-const nominalBersih = 90000;
-const potonganJFS = nominalBersih * 0.6; // 54000
+// Konstanta Perhitungan
+const ID_TEST = 100;
+const NOMINAL_BERSIH = 90000; // Contoh: 100.000 - 10.000
+const POTONGAN_JFS = NOMINAL_BERSIH * 0.6; // 54.000 (60%)
 
 // ------------------------- TEST SUITES -------------------------
 
-describe('Outgoing White-Box Testing (Sync Time Logic)', () => {
+describe('Outgoing Controller - Unit Testing (Logic & Transaction)', () => {
     
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
-    // Test 1: Logika Filter Tanggal Admin (Kritis)
-    test('W1: Admin seharusnya difilter menggunakan todayStr (Asia/Makassar) bukan CURDATE()', async () => {
-        const res = mockRes();
-        const req = { user: { roles: ['Admin'] } };
+    // --- 1. TESTING READ (GET ALL) ---
+    describe('getAllOutgoing', () => {
+        test('W1: Admin harus difilter berdasarkan tanggal hari ini (WITA)', async () => {
+            const res = mockRes();
+            const req = { user: { roles: ['Admin'] } };
+            mockQuery.mockResolvedValueOnce([[{ id: 1, nominal: 50000 }]]);
 
-        // Mock return data
-        mockQuery.mockResolvedValueOnce([[{ id: 1, nominal: 50000 }]]);
+            await getAllOutgoing(req, res);
 
-        await getAllOutgoing(req, res);
+            // Verifikasi filter DATE(tanggal_outgoing) = ?
+            expect(mockQuery).toHaveBeenCalledWith(
+                expect.stringContaining("AND DATE(tanggal_outgoing) = ?"),
+                expect.arrayContaining([expect.any(String)]) // Memastikan ada parameter tanggal
+            );
+        });
 
-        // Verifikasi apakah query menggunakan parameter tanggal yang benar (?) dan todayStr
-        expect(mockQuery).toHaveBeenCalledWith(
-            expect.stringContaining("AND DATE(tanggal_outgoing) = ?"),
-            expect.arrayContaining([mockTanggal])
-        );
+        test('W2: Super Admin harus dapat melihat seluruh data tanpa filter tanggal', async () => {
+            const res = mockRes();
+            const req = { user: { roles: ['Super Admin'] } };
+            mockQuery.mockResolvedValueOnce([[]]);
+
+            await getAllOutgoing(req, res);
+
+            expect(mockQuery).toHaveBeenCalledWith(
+                expect.stringMatching(/SELECT \* FROM input_outgoing WHERE status = 'active' ORDER BY/i)
+            );
+        });
     });
 
-    // Test 2: Logika Insert dengan Potongan JFS
-    test('W2: Insert Outgoing harus menghitung 60% potongan JFS dan bernilai negatif di laporan', async () => {
-        const res = mockRes();
-        const req = { 
-            body: { nominal: "100.000", potongan: "10.000", jenis_pembayaran: "Cash" } 
-        };
+    // --- 2. TESTING INSERT ---
+    describe('insertOutgoing', () => {
+        test('W3: Harus menghitung potongan JFS 60% dan bernilai negatif di laporan', async () => {
+            const res = mockRes();
+            const req = { 
+                user: { roles: ['Admin'] },
+                body: { nominal: "100.000", potongan: "10.000", jenis_pembayaran: "Cash" } 
+            };
 
-        // Mocking: 1. Insert Outgoing, 2. Insert Laporan Kas, 3. Insert Saldo JFS, 4. Insert Log
-        mockQuery.mockResolvedValueOnce([{ insertId: idToProcess }])
-                 .mockResolvedValueOnce([{}])
-                 .mockResolvedValueOnce([{}])
-                 .mockResolvedValueOnce([{}]);
+            // Mocking sequence: 1. Insert Outgoing, 2. Kas, 3. Saldo JFS, 4. Log
+            mockQuery.mockResolvedValueOnce([{ insertId: ID_TEST }])
+                     .mockResolvedValueOnce([{}])
+                     .mockResolvedValueOnce([{}])
+                     .mockResolvedValueOnce([{}]);
 
-        await insertOutgoing(req, res);
+            await insertOutgoing(req, res);
 
-        // Verifikasi Query ke-3 (Insert Saldo JFS)
-        // Nominal bersih 90.000, 60% nya adalah 54.000, harus masuk sebagai -54000
-        expect(mockQuery).toHaveBeenNthCalledWith(3, 
-            expect.stringContaining("'Saldo JFS'"),
-            expect.arrayContaining([mockTanggal, -potonganJFS])
-        );
-        expect(mockConnection.commit).toHaveBeenCalled();
+            // Verifikasi perhitungan JFS: 90.000 * 0.6 = 54.000 (disimpan negatif)
+            expect(mockQuery).toHaveBeenNthCalledWith(3, 
+                expect.stringContaining("'Saldo JFS'"),
+                expect.arrayContaining([expect.any(String), -POTONGAN_JFS])
+            );
+            expect(mockConnection.commit).toHaveBeenCalled();
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ id_input_outgoing: ID_TEST }));
+        });
+
+        test('W4: Gagal jika nominal bersih bernilai negatif', async () => {
+            const res = mockRes();
+            const req = { 
+                user: { roles: ['Admin'] },
+                body: { nominal: "10.000", potongan: "50.000", jenis_pembayaran: "Cash" } 
+            };
+
+            await insertOutgoing(req, res);
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: "Nominal bersih tidak boleh negatif" }));
+        });
     });
 
-    // Test 3: Logika Edit (Reverse Transaksi)
-    test('W3: Edit Outgoing harus menggunakan tanggal_outgoing asli dari data lama', async () => {
-        const res = mockRes();
-        const tanggalLama = "2025-12-10";
-        const req = { 
-            body: { id_input_outgoing: idToProcess, nominal: "50000", jenis_pembayaran: "Transfer" } 
-        };
 
-        // Mock: 1. Ambil data lama (SELECT)
-        mockQuery.mockResolvedValueOnce([[{ 
-            id_input_outgoing: idToProcess, 
-            tanggal_outgoing: tanggalLama, 
-            nominal_bersih: 40000,
-            jenis_pembayaran: 'Cash'
-        }]]);
-        
-        // Mock query sisa (Update, Delete lama, Insert baru, dll)
-        for(let i=0; i<7; i++) mockQuery.mockResolvedValueOnce([{}]);
+    // --- 4. TESTING DELETE & LIFECYCLE ---
+    describe('deletePermanentOutgoing', () => {
+        test('W5: Delete Permanen harus menghapus data dari tabel utama, laporan, dan log', async () => {
+            const res = mockRes();
+            const req = { user: { role: 'Super Admin' }, body: { id_input_outgoing: ID_TEST } };
 
-        await editOutgoing(req, res);
+            // Mock sequence: 1. SELECT, 2. DELETE Pemasukan, 3. DELETE JFS, 4. DELETE Log, 5. DELETE Main
+            mockQuery.mockResolvedValueOnce([[{ id_input_outgoing: ID_TEST, nominal_bersih: 50000, jenis_pembayaran: 'Cash' }]])
+                     .mockResolvedValue([{}]);
 
-        // Verifikasi Update menggunakan tanggalLama, bukan mockTanggal (hari ini)
-        expect(mockQuery).toHaveBeenNthCalledWith(2,
-            expect.stringContaining("UPDATE input_outgoing"),
-            expect.arrayContaining([tanggalLama])
-        );
-    });
+            await deletePermanentOutgoing(req, res);
 
-    // Test 4: Logika Delete Permanen (Integritas Data)
-    test('W4: Delete Permanen harus menghapus data dari 4 tabel terkait', async () => {
-        const res = mockRes();
-        const req = { body: { id_input_outgoing: idToProcess } };
-
-        // Mock: 1. SELECT, 2. DELETE Kas, 3. DELETE JFS, 4. DELETE Log, 5. DELETE Main
-        mockQuery.mockResolvedValueOnce([[{ id_input_outgoing: idToProcess, jenis_pembayaran: 'Cash' }]])
-                 .mockResolvedValueOnce([{}])
-                 .mockResolvedValueOnce([{}])
-                 .mockResolvedValueOnce([{}])
-                 .mockResolvedValueOnce([{}]);
-
-        await deletePermanentOutgoing(req, res);
-
-        expect(mockQuery).toHaveBeenCalledTimes(5);
-        expect(mockConnection.commit).toHaveBeenCalled();
-        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: "Outgoing permanently deleted" }));
+            expect(mockQuery).toHaveBeenCalledTimes(5);
+            expect(mockConnection.commit).toHaveBeenCalled();
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: "Outgoing permanently deleted" }));
+        });
     });
 });

@@ -1,12 +1,12 @@
 import pool from "../config/dbconfig.js";
 
-const formatTanggal = () => {
+export const formatTanggal = () => {
   return new Date().toLocaleDateString("en-CA", {
     timeZone: "Asia/Makassar",
   });
 };
 
-const parseNominal = (nominal) => {
+export const parseNominal = (nominal) => {
     const clean = String(nominal).replace(/\./g, "");
     const number = Number(clean);
 
@@ -18,7 +18,7 @@ const parseNominal = (nominal) => {
 };
 
 
-const mapJenisTransaksi = (jenis_pembayaran) => {
+export const mapJenisTransaksi = (jenis_pembayaran) => {
     if (jenis_pembayaran === "Cash") return "Kas";
     if (jenis_pembayaran === "Transfer") return "Transfer";
     return null;
@@ -74,7 +74,7 @@ export const insertPengeluaran = async (req, res) => {
     if (!isAuthorized) {
         return res.status(403).json({ error: "Akses ditolak: Hanya Admin dan Super Admin yang diizinkan" });
     }
-    
+
     const conn = await pool.getConnection(); // ambil koneksi
     await conn.beginTransaction(); // Mulai transaksi
 
